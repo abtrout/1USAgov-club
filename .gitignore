@@ -1,0 +1,5 @@
+.gitignore
+.vagrant
+producers/stream_producer/stream_producer
+producers/bulk_producer/bulk_producer
+producers/bulk_producer/input.txt
