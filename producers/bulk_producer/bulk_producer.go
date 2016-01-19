@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"github.com/shopify/sarama"
 	"log"
@@ -39,11 +40,19 @@ func main() {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		producer.Input() <- &sarama.ProducerMessage{
-			Topic: *topic,
-			Value: sarama.StringEncoder(line),
+
+		if isJSON(line) {
+			producer.Input() <- &sarama.ProducerMessage{
+				Topic: *topic,
+				Value: sarama.StringEncoder(line),
+			}
 		}
 	}
+}
+
+func isJSON(s string) bool {
+	var tmp map[string]interface{}
+	return json.Unmarshal([]byte(s), &tmp) == nil
 }
 
 func newAsyncProducer(brokerList []string) sarama.AsyncProducer {

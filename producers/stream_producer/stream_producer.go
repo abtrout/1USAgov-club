@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"github.com/shopify/sarama"
 	"log"
@@ -33,13 +34,20 @@ func main() {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			log.Println("Failed to ReadBytes:", err)
-		} else if len(line) > 2 {
+		}
+
+		if isJSON(line) {
 			producer.SendMessage(&sarama.ProducerMessage{
 				Topic: *topic,
 				Value: sarama.StringEncoder(line),
 			})
 		}
 	}
+}
+
+func isJSON(bytes []byte) bool {
+	var tmp map[string]interface{}
+	return json.Unmarshal(bytes, &tmp) == nil
 }
 
 func newSyncProducer(brokerList []string) sarama.SyncProducer {
