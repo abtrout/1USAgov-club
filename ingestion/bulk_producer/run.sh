@@ -2,7 +2,7 @@
 
 #KAFKA_PEERS=""
 #KAFKA_TOPIC=""
-INPUT_FILE="input.txt"
+#INPUT_FILE=""
 
 # If `bulk_producer` hasn't been build, then we build it.
 [ ! -f bulk_producer ] && go build
