@@ -22,7 +22,7 @@ function get_filenames {
   echo -ne " > Getting filenames..."
 
   LINK_TAG="<a href=\"/bitly_archive/usagov_bitly_data[0-9-]+.gz\">"
-  curl -s "$BASE_URL/$YEAR/" | egrep -o "$LINK_TAG" | cut -d\" -f2 >> $TMP_FILE
+  curl -sL "$BASE_URL/$YEAR/" | egrep -o "$LINK_TAG" | cut -d\" -f2 >> $TMP_FILE
   echo
 }
 
