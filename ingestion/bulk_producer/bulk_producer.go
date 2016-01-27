@@ -15,6 +15,7 @@ var (
 	brokers  = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The kafka brokers to connect to, as a comma separated list")
 	topic    = flag.String("topic", os.Getenv("KAFKA_TOPIC"), "The Kafka topic to publish messages to")
 	filename = flag.String("file", os.Getenv("INPUT_FILE"), "File to read raw traffic from")
+	batchInterval = flag.Int("batch-interval", 500, "Batch interval (in milliseconds)")
 )
 
 func main() {
@@ -59,7 +60,7 @@ func newAsyncProducer(brokerList []string) sarama.AsyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForLocal
 	config.Producer.Compression = sarama.CompressionSnappy
-	config.Producer.Flush.Frequency = 500 * time.Millisecond
+	config.Producer.Flush.Frequency = time.Duration(*batchInterval) * time.Millisecond
 
 	producer, err := sarama.NewAsyncProducer(brokerList, config)
 	if err != nil {
