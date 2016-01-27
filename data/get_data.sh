@@ -7,6 +7,7 @@
 # See http://1usagov.measuredvoice.com/ for more details.
 function get_archives {
   echo "Downloading 1USA.gov archives for $YEAR:"
+  #BASE_URL="1usagov.measuredvoice.com.s3-website-us-east-1.amazonaws.com"
   BASE_URL="http://1usagov.measuredvoice.com"
   TMP_FILE=$(mktemp)
 
