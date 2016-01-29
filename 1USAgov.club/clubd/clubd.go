@@ -16,8 +16,7 @@ func main() {
 	defer session.Close()
 
 	router := httprouter.New()
-	router.GET("/stats/inbound", InboundCounts)
-	router.GET("/stats/outbound", OutboundCounts)
+	router.GET("/stats/counts", HostCounts)
 	router.GET("/stats/topk", TopLeaders)
 
 	// TODO: finish implementing routes

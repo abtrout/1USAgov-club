@@ -1,26 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
-
-func InboundCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	table := "inbound_counts"
-	hostnames := []string{"direct", "facebook.com", "t.co"}
-
-	jsonHandler(w, r, getCounts(table, hostnames))
-}
-
-func OutboundCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	table := "outbound_counts"
-	hostnames := []string{"nasa.gov", "nsa.gov", "cia.gov"}
-
-	jsonHandler(w, r, getCounts(table, hostnames))
-}
 
 type HostCount struct {
 	Timestamp int64  `json:"ts"`
@@ -29,18 +16,28 @@ type HostCount struct {
 	Unique    int    `json:"unique"`
 }
 
-func getCounts(table string, hostnames []string) []HostCount {
+func HostCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var count HostCount
 	counts := []HostCount{}
 
-	q := "SELECT ts, hostname, total, unique FROM %s WHERE hostname IN ? LIMIT 25"
-	iter := session.Query(fmt.Sprintf(q, table), hostnames).Iter()
+	query, _ := url.ParseQuery(r.URL.RawQuery)
+	hostnames, ok := query["hostnames"]
+	if ok && len(hostnames) > 0 {
+		hostnames = strings.Split(hostnames[0], ",")
+	} else {
+		hostnames = []string{"facebook.com", "t.co", "vk.com"}
+	}
+
+	tMin := (time.Now().UTC().UnixNano() / 1e6) - 864e5
+
+	q := "SELECT ts, hostname, total, unique FROM host_counts WHERE hostname IN ? AND ts > ?"
+	iter := session.Query(q, hostnames, tMin).Iter()
 
 	for iter.Scan(&count.Timestamp, &count.Hostname, &count.Total, &count.Unique) {
 		counts = append(counts, count)
 	}
 
-	return counts
+	jsonHandler(w, r, counts)
 }
 
 type KthLeader struct {
