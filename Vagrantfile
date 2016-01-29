@@ -1,6 +1,7 @@
 #vim: ft=ruby
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
 
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
@@ -33,7 +34,7 @@ Vagrant.configure(2) do |config|
 
     go get github.com/shopify/sarama
     go get github.com/julienschmidt/httprouter
-    go get github.com/tsuna/gohbase
+    go get github.com/gocql/gocql
 
     # TODO: add scala installation here, too
   SHELL
