@@ -1,17 +1,23 @@
 package main
 
 import (
+	"flag"
 	"github.com/gocql/gocql"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 var (
 	session *gocql.Session
+	keyspace = flag.String("keyspace", os.Getenv("CASSANDRA_KEYSPACE"), "Cassandra keyspace")
+	hosts = flag.String("hosts", os.Getenv("CASSANDRA_HOSTS"), "Cassandra hosts in a comma-separated list")
 )
 
 func main() {
+	flag.Parse()
 	session = startCassandraSession()
 	defer session.Close()
 
@@ -28,17 +34,13 @@ func main() {
 
 // Initializes our Cassandra session.
 func startCassandraSession() *gocql.Session {
-	cluster := gocql.NewCluster("davidc-storage1", "davidc-storage2", "davidc-storage3", "davidc-storage4")
-	cluster.Keyspace = "oneusa"
-	cluster.Consistency = gocql.Quorum
-
+	cluster := gocql.NewCluster(strings.Split(*hosts, ",")...)
+	cluster.Keyspace = *keyspace
 	session, err := cluster.CreateSession()
+
 	if err != nil {
 		log.Fatal("Failed to start cassandra session: ", err)
 	}
 
 	return session
 }
-
-// Initializes our Kafka consumer.
-//func kafkaInit() {}
