@@ -1,15 +1,17 @@
 package com.github.abtrout._1USAgov_club
 
-import org.apache.spark.SparkConf
-import org.apache.spark.streaming._
-import org.apache.spark.streaming.kafka._
+import argonaut._, Argonaut._
 
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.streaming._
 
-import argonaut._, Argonaut._
+import org.apache.spark.SparkConf
+import org.apache.spark.streaming._
+import org.apache.spark.streaming.kafka._
 
-object StreamingStats extends HostCountHelpers with SketchHelpers {
+object StreamingStats extends GenStatsHelpers
+  with HostCountHelpers
+  with SketchHelpers {
 
   private val batchTime = getEnv("BATCH_SECONDS", "2").toInt
   private val numThreads = getEnv("NUM_THREADS", "1").toInt
@@ -59,7 +61,21 @@ object StreamingStats extends HostCountHelpers with SketchHelpers {
     requests.map(buildSketches)
       .reduceByWindow(combineSketches, Minutes(batchTime * 10), Seconds(batchTime * 10))
       .map(prepareTopKRows)
-      .saveToCassandra("oneusa", "topk", topkColumns)
+      .saveToCassandra("oneusa", "topk", topkCols)
+
+    // Our last query of interest tracks general stats:
+    // * counts of unique outgoing hosts, user agents, and country codes
+    // * requests per second (and quartiles for requests per second)
+    //
+    // These are sliding window computations over the last 30 minutes of data, updated
+    // every (batchSize * 10) seconds.
+
+    val genStatsCols = SomeColumns("day", "ts", "reqps", "govurls", "countries", "agents")
+
+    requests.map(buildGenStats)
+      .reduceByWindow(combineGenStats, Minutes(60), Seconds(batchTime * 5))
+      .map(prepareGenStatsRows)
+      .saveToCassandra("oneusa", "gen_stats", genStatsCols)
 
     ssc.start()
     ssc.awaitTermination()
