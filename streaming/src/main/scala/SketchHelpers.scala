@@ -3,11 +3,15 @@ package com.github.abtrout._1USAgov_club
 import com.twitter.algebird.{TopCMS, TopPctCMS}
 import com.twitter.algebird.CMSHasherImplicits._
 
+import com.datastax.spark.connector.SomeColumns
+
 trait SketchHelpers extends RequestHelpers {
 
   type TopKQueries = Tuple3[Long, TopCMS[String], TopCMS[String]]
 
-  private def getLeaders(cms: TopCMS[String], k: Int = 25) = {
+  val topkCols = SomeColumns("day", "ts", "topkin", "topkout")
+
+  private def getLeaders(cms: TopCMS[String], k: Int = 10) = {
     cms.heavyHitters
       .map(x => (x, cms.frequency(x).estimate)).toSeq
       .sortBy(_._2).reverse.slice(0, k)

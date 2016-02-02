@@ -1,13 +1,16 @@
 package com.github.abtrout._1USAgov_club
 
-import argonaut._, Argonaut._
-
-import com.datastax.spark.connector._
-import com.datastax.spark.connector.streaming._
+import com.twitter.algebird._
+import com.twitter.algebird.CMSHasherImplicits._
 
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka._
+
+import com.datastax.spark.connector._
+import com.datastax.spark.connector.streaming._
+
+import argonaut._, Argonaut._
 
 object StreamingStats extends GenStatsHelpers
   with HostCountHelpers
@@ -23,15 +26,14 @@ object StreamingStats extends GenStatsHelpers
   private val checkpointURL = getEnv("CHECKPOINT_URL", "hdfs://localhost:9000/checkpoint")
 
   def main(args: Array[String]) = {
-
-    val conf = new SparkConf().setAppName("StreamingStats")
+    val conf = new SparkConf()
       .set("spark.cassandra.connection.host", cassandraHost)
+      .setAppName("StreamingStats")
 
     val ssc = new StreamingContext(conf, Seconds(batchTime))
     ssc.checkpoint(checkpointURL)
 
     val topicMap = topics.split(",").map((_, numThreads)).toMap
-
     val stream = ssc.union((1 to numStreams).map(i =>
       KafkaUtils.createStream(ssc, zkQuorum, cgroup, topicMap)))
 
@@ -44,40 +46,43 @@ object StreamingStats extends GenStatsHelpers
     //
     // Inbound and outbound hosts get lumped together here and computed stats
     // end up together in the same `host_counts` table in Cassandra.
+    val counts = requests.flatMap(buildCounts)
 
-    val hostCountCols = SomeColumns("day", "hour", "minute", "hostname", "total", "unique")
-
-    requests.flatMap(buildCounts)
+    counts.map(toMinutes)
       .reduceByKey(combineCounts)
-      .map(prepareHostCountRows)
-      .saveToCassandra("oneusa", "host_counts", hostCountCols)
+      .map(prepareMinutelyCountRows)
+      .saveToCassandra("oneusa", "counts_minute", minutelyCountCols)
 
-    // We track a few Top K queries:
-    //  * ~~Top K most frequently seen (inboundHost, outboundHost) pairs~~
-    //  * Top K most frequently seen inboundHosts 
-    //  * Top K most freqneutly seen outboundHosts
+    counts.map(toHours)
+      .reduceByKey(combineCounts)
+      .map(prepareHourlyCountRows)
+      .saveToCassandra("oneusa", "counts_hour", hourlyCountCols)
+
+    counts.map(toDays)
+      .reduceByKey(combineCounts)
+      .map(prepareDailyCountRows)
+      .saveToCassandra("oneusa", "counts_day", dailyCountCols)
+
+    // We track Top K queries for most frequently seen inbound/outbound hosts.
     //
-    // These are built from the past (batchTime * 10) minutes, and are written to the `topk`
-    // table in Cassandra, every (batchTime * 10) seconds. Currently, K = 25.
-
-    val topkCols = SomeColumns("day", "ts", "topkin", "topkout")
+    // Currently K = 10 and these are computed every `batchTime * 5` seconds over
+    // the past `batchTime * 5` minutes of requests. Note that this is a windowed
+    // computation; both the window length and sliding interval must be multiples
+    // of batchTime!
 
     requests.map(buildSketches)
-      .reduceByWindow(combineSketches, Minutes(60), Seconds(batchTime * 5))
+      .reduceByWindow(combineSketches, Minutes(batchTime * 5), Seconds(batchTime * 5))
       .map(prepareTopKRows)
       .saveToCassandra("oneusa", "topk", topkCols)
 
-    // Our last query of interest tracks general stats:
-    // * counts of unique outgoing hosts, user agents, and country codes
-    // * requests per second (and quartiles for requests per second)
+    // Lastly, we track some general stats:
+    // * counts of unique government hosts and country codes (using HLL)
+    // * average requests per second
     //
-    // These are sliding window computations over the last 30 minutes of data, updated
-    // every (batchSize * 10) seconds.
-
-    val genStatsCols = SomeColumns("day", "ts", "reqps", "govurls", "countries", "agents")
+    // These are windowed computations with similar bounds as above.
 
     requests.map(buildGenStats)
-      .reduceByWindow(combineGenStats, Minutes(60), Seconds(batchTime * 5))
+      .reduceByWindow(combineGenStats, Minutes(batchTime * 5), Seconds(batchTime * 5))
       .map(prepareGenStatsRows)
       .saveToCassandra("oneusa", "gen_stats", genStatsCols)
 
