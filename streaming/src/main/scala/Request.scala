@@ -26,23 +26,24 @@ object Request extends RequestHelpers {
       c <- (cur --\ "c").as[String]
       // 1USAgov sends us timestamps in seconds; we want milliseconds!
       ts = t * 1000
-      // We only care about hostnames, not URLs.
-      // TODO: rename `sourceURL` and `destURL`
-      sourceURL = parseHost(r)
-      destURL = parseHost(u)
-    } yield Request(ts, sourceURL, destURL, nk, a, c))
+      // MANUAL OVERRIDE !@# (for replaying old data)
+      // ts = System.currentTimeMillis
+    } yield Request(ts, parseHost(r), parseHost(u), nk, a, c))
 }
 
 trait RequestHelpers {
+
+  // All of our incoming data comes with a timestamp, but we will usually want to
+  // round down to day/hour/minute for more convenient interfacing with Cassandra.
+  def splitTimestamp(ts: Long) = {
+    (roundDay(ts), roundHour(ts), roundMinute(ts), roundSecond(ts))
+  }
 
   def roundTimestamp(ts: Long, ms: Int = 1): Long = ts - (ts % ms)
   def roundSecond(ts: Long, n: Int = 1) = roundTimestamp(ts, 1000 * n)
   def roundMinute(ts: Long, n: Int = 1) = roundSecond(ts, 60 * n)
   def roundHour(ts: Long, n: Int = 1) = roundMinute(ts, 60 * n)
   def roundDay(ts: Long) = roundHour(ts, 24)
-
-  def splitTimestamp(ts: Long) =
-    (roundDay(ts), roundHour(ts), roundMinute(ts), roundSecond(ts))
 
   // Incoming data includes two URLs: the referring URL, the destination URL.
   // For most of our stats, we're only interested in hostnames though.
@@ -54,9 +55,7 @@ trait RequestHelpers {
     // generic default value. Also, we strip leading `www.`.
     Try(new URI(url.split(" ")(0)).getHost) match {
       case Success(host) if host != null => host.replaceFirst("^www.", "")
-      case _ =>
-        println("Failed to parse hostname from URL:", url)
-        "INVALID"
+      case _ => "INVALID"
     }
   }
 }
