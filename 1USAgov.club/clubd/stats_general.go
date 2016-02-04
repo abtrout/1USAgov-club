@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gocql/gocql"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
@@ -25,8 +26,10 @@ func GeneralStats(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	err := session.Query(q, day).Scan(&stats.Timestamp,
 		&stats.RequestsPerSecond, &stats.GovHosts, &stats.CountryCodes)
 
-	// TODO: catch ErrNotFound here and respond with 404 instead of 500.
-	if err != nil {
+	if err == gocql.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
 		log.Println("Failed to get gen_stats: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
