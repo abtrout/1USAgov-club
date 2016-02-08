@@ -4,35 +4,66 @@
 
   <title>1USAgov Club</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- more meta -->
   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.css">
-
-  <style type="text/css">
-    .container {
-      width: 95%;
-      max-width: 620px;
-      margin: 5% auto;
-
-      font-family: sans-serif;
-    }
-    .text-xl { font-size: 3em; }
-    .text-md { font-size: 1.5em; }
-    .text-sm { font-size: 1em; }
-
-    .text-right { text-align: right; }
-  </style>
+  <link rel="stylesheet" type="text/css" href="style.css">
 
 </head>
 <body>
 
-  <div class="container">
-    <div class="text-xl"><strong>1USAgov</strong> club</div>
-    <div id="chart"></div>
-  </div>
+  <header class="header">
+    <div class="table container">
+      <div class="table">
+        <div class="table-cell text-left">
+          <span class="text-lg">1USAgov <strong>club</strong></span>
+        </div>
+        <div class="table-cell text-right">
+          <ul class="menu">
+            <li><a href="/slides">slides</a></li>
+            <li><a href="https://github.com/abtrout/1USAgov-club">github</a></li>
+            <li><a href="https://linkedin.com/in/cochrandv">linkedin</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="section" id="general">
+    <div class="container">
+      <h3 class="text-md">general stats</h3>
+      <ul class="genstats">
+        <li class="text-sm"><strong><span id="govURLs"></span></strong> unique government URLs</li>
+        <li class="text-sm"><strong><span id="countries"></span></strong> unique country codes</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="counts">
+    <div class="container">
+      <h3 class="text-md">counts by host per minute</h3>
+      <div class="chart" id="countsByHost"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h3 class="text-md">top 10 outbound hosts</h3>
+      <div class="chart" id="topkOut"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h3 class="text-md">top 10 inbound hosts</h3>
+      <div class="chart" id="topkIn"></div>
+    </div>
+  </section>
 
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.14/d3.min.js"></script>
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.js"></script>
-  <script type="text/javascript" src="clubstats.js"></script>
+
+  <script type="text/javascript" src="clubstats/genstats.js"></script>
+  <script type="text/javascript" src="clubstats/topk.js"></script>
+  <script type="text/javascript" src="clubstats/hostcounts.js"></script>
 
   <script type="text/javascript">
     document._EUGO = 'c74116cbcbf50db0bde9';

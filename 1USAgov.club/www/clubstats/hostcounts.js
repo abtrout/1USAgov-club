@@ -1,11 +1,8 @@
 (function() {
 
   var chart = c3.generate({
-    bindto: "#chart",
-    data: {
-      x: "x",
-      columns: []
-    },
+    bindto: "#countsByHost",
+    data: { x: "x", columns: [] },
     axis: {
       x: {
         type: "timeseries",
@@ -18,16 +15,17 @@
           return new Date(d).toLocaleString();
         }
       }
-    }
+    },
+    legend: { show: false }
   });
 
   refresh();
-  setInterval(refresh, 2000);
+  setInterval(refresh, 5000);
 
   function refresh() {
     var http = new XMLHttpRequest();
 
-    http.open("GET", "/stats/counts?hostnames=facebook.com,nsa.gov,fbi.gov,nasa.gov,direct");
+    http.open("GET", "/stats/counts");
     http.addEventListener("load", loadHandler);
     http.send();
   }
@@ -44,8 +42,6 @@
     for(var i=0; i<data.length; i++) {
       var d = data[i];
       parsed[d.hostname] = parsed[d.hostname] || {};
-
-      if(parsed[d.hostname].hasOwnProperty(d.ts)) { console.log("FUCK"); }
       parsed[d.hostname][d.ts] = d.total; 
     }
 
