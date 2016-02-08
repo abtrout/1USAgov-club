@@ -1,31 +1,70 @@
 (function() {
 
-  var chart = c3.generate({
-    bindto: "#countsByHost",
-    data: { x: "x", columns: [] },
-    axis: {
-      x: {
-        type: "timeseries",
-        tick: { format: "%H:%M" }
-      }
-    },
-    tooltip: {
-      format: {
-        title: function(d) { 
-          return new Date(d).toLocaleString();
-        }
-      }
-    },
-    legend: { show: false }
+  // Host counts are displayed as a timeseries graph with C3.
+  var chart = makeChart(),
+      refreshInt = null,
+      hostnames = [];
+
+  refreshInt = setInterval(refresh, 2000);
+  refresh();
+
+  $("submitHosts").addEventListener("click", filterHosts);
+  $("hostnames").addEventListener("keypress", function(evt) {
+    if(evt.keyCode == 13) filterHosts();
   });
 
-  refresh();
-  setInterval(refresh, 2000);
+  function makeChart() {
+    return c3.generate({
+      bindto: "#countsByHost",
+      data: {
+        x: "x",
+        columns: []
+      },
+      axis: {
+        x: {
+          type: "timeseries",
+          tick: { format: "%H:%M" }
+        }
+      },
+      tooltip: {
+        format: {
+          title: function(d) { 
+            return new Date(d).toLocaleString();
+          }
+        }
+      },
+      legend: { show: false }
+    });
+  }
+
+  // A comma/space delimited list of hostnames can be provided with
+  // our requests to /stats/counts to view stats for specific host(s).
+  //
+  // When this happens, we need to reset our refresh() interval.
+  function filterHosts(evt) {
+    hostnames = $("hostnames").value
+      .replace(/,/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .split(" ")
+
+    // Clear existing data.
+    clearInterval(refreshInt);
+    chart = makeChart();
+
+    // Start loading new data for these hostnames instead.
+    refreshInt = setInterval(refresh, 2000);
+    refresh();
+  }
 
   function refresh() {
-    var http = new XMLHttpRequest();
+    var http = new XMLHttpRequest(),
+        url = "/stats/counts";
 
-    http.open("GET", "/stats/counts");
+    if(hostnames.length) {
+      url += "?hostnames=" + hostnames.join(",");
+    }
+
+    http.open("GET", url);
     http.addEventListener("load", loadHandler);
     http.send();
   }
@@ -35,7 +74,8 @@
     chart.load({ columns: data });
   }
 
-  // TODO: make clubd return this properly formatted...
+  // C3 expects data in slightly/very different format than the 1USAgov
+  // API responds with. Unfortunately we have to do some munging :|
   function transformResponse(data) {
     var parsed = {};
 
@@ -67,5 +107,8 @@
 
     return [dates].concat(entries);
   }
+
+  // jQuery light!
+  function $(id) { return document.getElementById(id); }
 
 }());
