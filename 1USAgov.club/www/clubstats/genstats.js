@@ -1,7 +1,7 @@
 (function() {
 
   refresh();
-  setInterval(refresh, 2000);
+  setInterval(refresh, 3000);
   
   function refresh() {
     var http = new XMLHttpRequest();
