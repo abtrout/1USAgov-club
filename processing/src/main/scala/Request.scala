@@ -9,7 +9,6 @@ case class Request(
   sourceURL: String,
   destURL: String,
   knownUser: Int,
-  userAgent: String,
   countryCode: String)
 
 object Request extends RequestHelpers {
@@ -22,13 +21,12 @@ object Request extends RequestHelpers {
       r <- (cur --\ "r").as[String]
       u <- (cur --\ "u").as[String]
       nk <- (cur --\ "nk").as[Int]
-      a <- (cur --\ "a").as[String]
       c <- (cur --\ "c").as[String]
       // 1USAgov sends us timestamps in seconds; we want milliseconds!
-      ts = t * 1000
-      // MANUAL OVERRIDE !@# (for replaying old data)
-      // ts = System.currentTimeMillis
-    } yield Request(ts, parseHost(r), parseHost(u), nk, a, c))
+      // ts = t * 1000
+      // MANUAL OVERRIDE for replaying old data:
+      ts = System.currentTimeMillis
+    } yield Request(ts, parseHost(r), parseHost(u), nk, c))
 }
 
 trait RequestHelpers {
@@ -47,14 +45,14 @@ trait RequestHelpers {
 
   // Incoming data includes two URLs: the referring URL, the destination URL.
   // For most of our stats, we're only interested in hostnames though.
+  //
+  // Some requests are made directly, so we handle that case separately.
   def parseHost(url: String): String = {
-    // Catch a special case ("direct" visit) up front.
     if(url == "direct") return "DIRECT"
 
-    // Some data is inevitably messed up. We catch [URISyntax]Exceptions with a
-    // generic default value. Also, we strip leading `www.`.
     Try(new URI(url.split(" ")(0)).getHost) match {
-      case Success(host) if host != null => host.replaceFirst("^www.", "")
+      case Success(host) if host != null =>
+        host.replaceFirst("^www\\.", "")
       case _ => "INVALID"
     }
   }
