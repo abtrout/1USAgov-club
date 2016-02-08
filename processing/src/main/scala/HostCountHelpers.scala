@@ -8,7 +8,7 @@ trait HostCountHelpers extends RequestHelpers {
   type Host = Tuple2[String, Long]
   type HostCounts = Tuple2[Host, Counts]
 
-  val hostCountRows = SomeColumns("day", "minute", "hostname", "total", "unique")
+  val hostCountCols = SomeColumns("day", "minute", "hostname", "total", "unique")
 
   def buildCounts(r: Request): List[HostCounts] = {
     val minute = roundMinute(r.ts)

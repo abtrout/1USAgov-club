@@ -54,7 +54,7 @@ object ApproxStats extends GenStatsHelpers
     requests.flatMap(buildCounts)
       .reduceByKey(combineCounts)
       .map(prepareHostCountRows)
-      .saveToCassandra("oneusa", "host_counts", hostCountRows)
+      .saveToCassandra("oneusa", "host_counts", hostCountCols)
 
     // We track Top K queries for most frequently seen inbound/outbound hosts.
     //
