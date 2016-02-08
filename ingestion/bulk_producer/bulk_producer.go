@@ -2,20 +2,18 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"github.com/shopify/sarama"
 	"log"
 	"os"
 	"strings"
-	"time"
 )
 
 var (
-	brokers  = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The kafka brokers to connect to, as a comma separated list")
-	topic    = flag.String("topic", os.Getenv("KAFKA_TOPIC"), "The Kafka topic to publish messages to")
-	filename = flag.String("file", os.Getenv("INPUT_FILE"), "File to read raw traffic from")
-	batchInterval = flag.Int("batch-interval", 500, "Batch interval (in milliseconds)")
+	batchSize = flag.Int("batch-size", 5000, "Number of messages to send per batch")
+	filename  = flag.String("file", os.Getenv("INPUT_FILE"), "File to read raw traffic from")
+	brokers   = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The kafka brokers to connect to, as a comma separated list")
+	topic     = flag.String("topic", os.Getenv("KAFKA_TOPIC"), "The Kafka topic to publish messages to")
 )
 
 func main() {
@@ -40,27 +38,18 @@ func main() {
 	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
-		line := scanner.Text()
-
-		if isJSON(line) {
-			producer.Input() <- &sarama.ProducerMessage{
-				Topic: *topic,
-				Value: sarama.StringEncoder(line),
-			}
+		producer.Input() <- &sarama.ProducerMessage{
+			Topic: *topic,
+			Value: sarama.StringEncoder(scanner.Text()),
 		}
 	}
-}
-
-func isJSON(s string) bool {
-	var tmp map[string]interface{}
-	return json.Unmarshal([]byte(s), &tmp) == nil
 }
 
 func newAsyncProducer(brokerList []string) sarama.AsyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForLocal
 	config.Producer.Compression = sarama.CompressionSnappy
-	config.Producer.Flush.Frequency = time.Duration(*batchInterval) * time.Millisecond
+	config.Producer.Flush.MaxMessages = *batchSize
 
 	producer, err := sarama.NewAsyncProducer(brokerList, config)
 	if err != nil {
