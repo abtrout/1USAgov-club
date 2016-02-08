@@ -9,9 +9,9 @@ import (
 )
 
 type GenStats struct {
-	Timestamp         int64 `json:"ts"`
-	GovHosts          int   `json:"governmentHosts"`
-	CountryCodes      int   `json:"countryCodes"`
+	Timestamp    int64 `json:"ts"`
+	GovHosts     int   `json:"governmentHosts"`
+	CountryCodes int   `json:"countryCodes"`
 }
 
 func GeneralStats(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

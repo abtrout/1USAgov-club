@@ -3,6 +3,9 @@ package main
 import (
 	"github.com/julienschmidt/httprouter"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,8 +17,7 @@ type HostCount struct {
 }
 
 func HostCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	hostnames := []string{"nsa.gov", "nasa.gov", "nsf.gov"}
-	n := 60
+	hostnames, n := parseHostCountParams(r.URL.RawQuery)
 
 	// We're looking for records between tMin and tMax
 	tMax := time.Now().UTC().UnixNano() / 1e6
@@ -25,10 +27,9 @@ func HostCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// compute these ahead of time for use with `WHERE IN`
 	dayMax := tMax - (tMax % 864e5)
 	dayMin := tMin - (tMin % 864e5)
-
 	days := []int64{dayMax, dayMin}
 
-	cql := "SELECT minute, hostname, total, unique FROM counts_minute WHERE day IN ? AND hostname IN ? AND minute > ?"
+	cql := "SELECT minute, hostname, total, unique FROM host_counts WHERE day IN ? AND hostname IN ? AND minute > ?"
 	iter := session.Query(cql, days, hostnames, tMin).Iter()
 
 	counts := []HostCount{}
@@ -39,4 +40,36 @@ func HostCounts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 
 	jsonHandler(w, r, counts)
+}
+
+func parseHostCountParams(raw string) ([]string, int) {
+	var hostnames []string
+	defaultHostnames := []string{"nsa.gov", "jpl.nasa.gov", "whitehouse.gov"}
+
+	var n int
+	defaultN := 30
+
+	ps, err := url.ParseQuery(raw)
+	if err != nil {
+		return defaultHostnames, defaultN
+	}
+
+	ns, ok := ps["n"]
+	if !ok {
+		n = defaultN
+	} else {
+		n, err = strconv.Atoi(ns[0])
+		if err != nil {
+			n = defaultN
+		}
+	}
+
+	hs, ok := ps["hostnames"]
+	if !ok {
+		hostnames = defaultHostnames
+	} else {
+		hostnames = strings.Split(hs[0], ",")
+	}
+
+	return hostnames, n
 }
