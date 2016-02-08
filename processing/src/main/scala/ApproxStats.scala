@@ -12,32 +12,36 @@ import com.datastax.spark.connector.streaming._
 
 import argonaut._, Argonaut._
 
-object StreamingStats extends GenStatsHelpers
+object ApproxStats extends GenStatsHelpers
   with HostCountHelpers
   with SketchHelpers {
 
-  private val batchTime = getEnv("BATCH_SECONDS", "2").toInt
+  private val blockInterval = getEnv("BLOCK_INTERVAL", "200").toInt
+  private val batchInterval = getEnv("BATCH_INTERVAL", "2").toInt
+  private val maxRate = getEnv("MAX_RATE", "5000").toInt
   private val numThreads = getEnv("NUM_THREADS", "1").toInt
-  private val numStreams = getEnv("NUM_STREAMS", "1").toInt
-  private val topics = getEnv("KAFKA_TOPIC", "default")
-  private val cgroup = getEnv("CONSUMER_GROUP", "oneusagov")
-  private val zkQuorum = getEnv("ZOOKEEPER_QUORUM", "localhost:2181")
-  private val cassandraHost = getEnv("CASSANDRA_HOST", "localhost")
+  private val numStreams = getEnv("NUM_STREAMS", "3").toInt
   private val checkpointURL = getEnv("CHECKPOINT_URL", "hdfs://localhost:9000/checkpoint")
+  private val zkQuorum = getEnv("ZOOKEEPER_QUORUM", "localhost:2181")
+  private val topics = getEnv("KAFKA_TOPIC", "rawdata")
+  private val cassandraHost = getEnv("CASSANDRA_HOST", "localhost")
+  private val cgroup = getEnv("CONSUMER_GROUP", "oneusa")
 
   def main(args: Array[String]) = {
     val conf = new SparkConf()
+      .set("spark.streaming.blockInterval", s"$blockInterval")
+      .set("spark.streaming.receiver.maxRate", s"$maxRate")
       .set("spark.cassandra.connection.host", cassandraHost)
-      .setAppName("StreamingStats")
+      .setAppName("ApproxStats")
 
-    val ssc = new StreamingContext(conf, Seconds(batchTime))
+    val ssc = new StreamingContext(conf, Seconds(batchInterval))
     ssc.checkpoint(checkpointURL)
 
     val topicMap = topics.split(",").map((_, numThreads)).toMap
     val stream = ssc.union((1 to numStreams).map(i =>
       KafkaUtils.createStream(ssc, zkQuorum, cgroup, topicMap)))
 
-    val requests = stream.flatMap(_._2.decodeOption[Request])
+    val requests = stream.flatMap(_._2.decodeOption[Request]).cache()
 
     // Straightforward counting to (accurately) track total/unique traffic
     // per domain. We'd use HLL to track uniques, but 1USAgov already sends
@@ -46,43 +50,29 @@ object StreamingStats extends GenStatsHelpers
     //
     // Inbound and outbound hosts get lumped together here and computed stats
     // end up together in the same `host_counts` table in Cassandra.
-    val counts = requests.flatMap(buildCounts)
 
-    counts.map(toMinutes)
+    requests.flatMap(buildCounts)
       .reduceByKey(combineCounts)
-      .map(prepareMinutelyCountRows)
-      .saveToCassandra("oneusa", "counts_minute", minutelyCountCols)
-
-    counts.map(toHours)
-      .reduceByKey(combineCounts)
-      .map(prepareHourlyCountRows)
-      .saveToCassandra("oneusa", "counts_hour", hourlyCountCols)
-
-    counts.map(toDays)
-      .reduceByKey(combineCounts)
-      .map(prepareDailyCountRows)
-      .saveToCassandra("oneusa", "counts_day", dailyCountCols)
+      .map(prepareHostCountRows)
+      .saveToCassandra("oneusa", "host_counts", hostCountRows)
 
     // We track Top K queries for most frequently seen inbound/outbound hosts.
     //
-    // Currently K = 10 and these are computed every `batchTime * 5` seconds over
-    // the past `batchTime * 5` minutes of requests. Note that this is a windowed
+    // Currently K = 10 and these are computed every `batchInterval * 5` seconds over
+    // the past `batchInterval * 5` minutes of requests. Note that this is a windowed
     // computation; both the window length and sliding interval must be multiples
-    // of batchTime!
+    // of batchInterval!
 
     requests.map(buildSketches)
-      .reduceByWindow(combineSketches, Minutes(batchTime * 5), Seconds(batchTime * 5))
+      .reduceByWindow(combineSketches, Minutes(5), Seconds(batchInterval * 2))
       .map(prepareTopKRows)
       .saveToCassandra("oneusa", "topk", topkCols)
 
-    // Lastly, we track some general stats:
-    // * counts of unique government hosts and country codes (using HLL)
-    // * average requests per second
-    //
-    // These are windowed computations with similar bounds as above.
+    // Lastly, we track the unique number of country codes and government URLs
+    // seen over the past 5 minutes, updated every `batchInterval * 2` seconds.
 
     requests.map(buildGenStats)
-      .reduceByWindow(combineGenStats, Minutes(batchTime * 5), Seconds(batchTime * 5))
+      .reduceByWindow(combineGenStats, Minutes(5), Seconds(batchInterval * 2))
       .map(prepareGenStatsRows)
       .saveToCassandra("oneusa", "gen_stats", genStatsCols)
 
@@ -90,5 +80,7 @@ object StreamingStats extends GenStatsHelpers
     ssc.awaitTermination()
   }
 
-  def getEnv(name: String, default: String) = sys.env.get(name).getOrElse(default)
+  def getEnv(name: String, default: String) = {
+    sys.env.get(name).getOrElse(default)
+  }
 }
