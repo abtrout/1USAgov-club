@@ -8,9 +8,9 @@ import com.datastax.spark.connector.SomeColumns
 
 trait GenStatsHelpers extends RequestHelpers {
 
-  val genStatsCols = SomeColumns("day", "ts", "reqps", "govurls", "countries")
+  type GenStats = Tuple3[Long, HLL, HLL]
 
-  type GenStats = Tuple5[Long, Long, Int, HLL, HLL]
+  val genStatsCols = SomeColumns("day", "ts", "govurls", "countries")
 
   private val HLL_BITSIZE = 12
 
@@ -23,25 +23,23 @@ trait GenStatsHelpers extends RequestHelpers {
     val urlHLL = buildHLL(r.destURL)
     val countryHLL = buildHLL(r.countryCode)
 
-    (r.ts, r.ts, 1, urlHLL, countryHLL)
+    (r.ts, urlHLL, countryHLL)
   }
 
   def combineGenStats(g: GenStats, h: GenStats): GenStats = {
-    val (gtsMin, gtsMax, gtotal, gurlHLL, gcountryHLL) = g
-    val (htsMin, htsMax, htotal, hurlHLL, hcountryHLL) = h
+    val (gtsMax, gurlHLL, gcountryHLL) = g
+    val (htsMax, hurlHLL, hcountryHLL) = h
 
-    (gtsMin min htsMin, gtsMax max htsMax, gtotal + htotal,
-      gurlHLL + hurlHLL, gcountryHLL + hcountryHLL)
+    (gtsMax max htsMax, gurlHLL + hurlHLL, gcountryHLL + hcountryHLL)
   }
 
   def prepareGenStatsRows(gs: GenStats) = {
-    val (tsMin, tsMax, requests, urlHLL, countryHLL) = gs
-    val day = roundDay(tsMax)
+    val (tsMax, urlHLL, countryHLL) = gs
 
-    val perSec: Int = ((requests.toDouble / (tsMax - tsMin)) * 1000).toInt
+    val day = roundDay(tsMax)
     val countries = countryHLL.estimatedSize.toInt
     val urls = urlHLL.estimatedSize.toInt
 
-    (day, tsMax, perSec, urls, countries)
+    (day, tsMax, urls, countries)
   }
 }
