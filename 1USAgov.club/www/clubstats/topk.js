@@ -6,61 +6,56 @@
   refresh();
   setInterval(refresh, 5000);
 
-  function makeChart(id) {
-    return c3.generate({
-      bindto: id,
-      data: {
-        rows: [],
-        type: "bar"
-      },
-      legend: { show: false }
-    });
-  }
-
-  function barOrder(a, b) {
-    return a.values[0].value > b.values[0].value;
-  }
-
   function refresh() {
     var http = new XMLHttpRequest();
 
     http.open("GET", "/stats/topk?k=10");
     http.addEventListener("load", loadHandler);
-    http.addEventListener("error", errorHandler);
     http.send();
   }
 
   function loadHandler(evt) {
     var data = transformResponse(JSON.parse(evt.target.response));
 
-    topkIn.load({
-      rows: data.inbound,
-      unload: topkIn.rows
-    });
+    topkIn.load({ columns: data.inbound });
+    topkOut.load({ columns: data.outbound });
+  }
 
-    topkOut.load({
-      rows: data.outbound
-      //unload: topkOut.rows
+  function makeChart(id) {
+    return c3.generate({
+      bindto: id,
+      data: {
+        x: 'x',
+        columns: [],
+        type: "bar"
+      },
+      axis: {
+        x: {
+          type: "category",
+          categories: []
+        }
+      },
+      legend: { show: false }
     });
   }
 
-  // We produce arrays (... of arrays) for each host/count; separately
-  // parsing incoming and outgoing hosts and returning both.
   function transformResponse(data) {
-    var hostsIn = [],
-        countsIn = [];
+    var hostsIn = ['x'],
+        countsIn = ['total'];
 
-    for(host in data.inbound) {
-      hostsIn.push(host);
-      countsIn.push(data.inbound[host]);
+    var tmp = sortByKeys(data.inbound);
+    for(var i=0; i<tmp.length; i++) {
+      hostsIn.push(tmp[i]);
+      countsIn.push(data.inbound[tmp[i]]);
     }
 
-    var hostsOut = [],
-        countsOut = [];
+    var hostsOut = ['x'],
+        countsOut = ['total'];
 
-    for(host in data.outbound) {
-      hostsOut.push(host);
-      countsOut.push(data.outbound[host]);
+    var tmp = sortByKeys(data.outbound);
+    for(var i=0; i<tmp.length; i++) {
+      hostsOut.push(tmp[i]);
+      countsOut.push(data.outbound[tmp[i]]);
     }
 
     return {
@@ -69,10 +64,10 @@
     };
   }
 
-  function errorHandler() {
-    $("topk").classList.add("hidden");
+  function sortByKeys(obj) {
+    return Object.keys(obj).sort(function(x,y) {
+      return obj[y] - obj[x];
+    });
   }
 
-  function $(id) { return document.getElementById(id); }
 }());
-
