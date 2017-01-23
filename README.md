@@ -8,4 +8,4 @@ is a real-time web analytics platform for government URL redirects, created as p
 * [Cassandra](http://cassandra.apache.org/) for storage
 * [Spark-streaming](http://spark.apache.org/streaming/) for real-time processing with [Twitter Algebird](https://github.com/twitter/algebird)
 
-For more information: play around with [the site](https://1USAgov.club), check out my [demo slides](https://1USAgov.club/slides), or explore this repository!
+For more information: ~~play around with [the site](https://1USAgov.club), check out my [demo slides](https://1USAgov.club/slides), or~~ explore this repository!
